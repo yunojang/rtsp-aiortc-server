@@ -10,6 +10,7 @@ from av import VideoFrame
 from av.frame import Frame
 
 from aiohttp import web
+from aiohttp_middlewares import cors_middleware
 from aiortc import MediaStreamTrack, RTCPeerConnection, RTCSessionDescription, VideoStreamTrack
 # from aiortc.contrib.media import MediaBlackhole, MediaPlayer, MediaRecorder, MediaRelay
 
@@ -179,7 +180,7 @@ async def js(req):
   return web.Response(content_type="application/javascript", text=content)
 
 if __name__ == "__main__":
-    app = web.Application();
+    app = web.Application(middlewares=[cors_middleware(allow_all=True)]);
     app.router.add_get("/", index)
     app.router.add_get("/app.js", js)
     app.router.add_post("/offer", offer);
