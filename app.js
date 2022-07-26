@@ -48,7 +48,8 @@ function createPeerConnection() {
 }
 
 function negotiate() {
-  return pc.createOffer().then(function (offer) {
+  return pc.createOffer({ offerToReceiveVideo: true }).then(function (offer) {
+    console.log(offer.sdp);
     pc.setLocalDescription(offer);
   })
     .then(function () {
@@ -103,17 +104,17 @@ function connection() {
     dataChannelLog.textContent += '<' + evt.data + '\n';
   }
 
-  navigator.mediaDevices.getUserMedia({ video: true }).then(function (stream) {
-    stream.getTracks().forEach(function (track) {
-      pc.addTrack(track, stream);
-      track.enabled = !track.enabled
-    });
-    return negotiate();
-  }, function (err) {
-    alert('Could not acquire media: ' + err);
-  });
+  // navigator.mediaDevices.getUserMedia({ video: true }).then(function (stream) {
+  //   stream.getTracks().forEach(function (track) {
+  //     pc.addTrack(track, stream);
+  //     track.enabled = !track.enabled
+  //   });
+  //   return negotiate();
+  // }, function (err) {
+  //   alert('Could not acquire media: ' + err);
+  // });
 
-  // return negotiate();
+  return negotiate();
 }
 
 document.querySelector('#con').addEventListener('click', connection)

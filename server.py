@@ -8,7 +8,6 @@ from typing import Tuple
 import cv2
 from av import VideoFrame
 from av.frame import Frame
-from PIL import Image
 
 from aiohttp import web
 from aiortc import MediaStreamTrack, RTCPeerConnection, RTCSessionDescription, VideoStreamTrack
@@ -106,7 +105,8 @@ class VideoStreamTrack(MediaStreamTrack):
         pts, time_base = await self.next_timestamp()
         ret, frame = self.cap.read()
 
-        vf = VideoFrame.from_image(Image.fromarray(frame))
+        # vf = VideoFrame.from_image(Image.fromarray(frame))
+        vf = VideoFrame.from_ndarray(frame, format='bgr24')
         vf.pts = pts
         vf.time_base = time_base
         return vf
@@ -148,13 +148,13 @@ async def offer(request):
     def on_channel(channel):
       @channel.on('message')
       def on_message(message):
-        print(message)
+        channel.send(message)
         # pc.addTrack(VideoStreamTrack(message))
 
-    @pc.on("track")
-    def on_track(track):
+    # @pc.on("track")
+    # def on_track(track):
       # print('@@on_track', track)
-      pc.addTrack(VideoStreamTrack(params["url"]))
+    pc.addTrack(VideoStreamTrack(params["url"]))
 
     # handle offer
     await pc.setRemoteDescription(offer);
