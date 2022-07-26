@@ -1,6 +1,7 @@
 const iceConnectionLog = document.getElementById('ice-connection-state'),
   iceGatheringLog = document.getElementById('ice-gathering-state'),
-  signalingLog = document.getElementById('signaling-state');
+  signalingLog = document.getElementById('signaling-state'),
+  dataChannelLog = document.getElementById('data-channel');
 
 let pc;
 let dc;
@@ -21,9 +22,8 @@ function createPeerConnection() {
 
   pc.addEventListener('track', evt => {
     console.log(evt)
-    console.log(evt.streams[0]);
     if (evt.track.kind == 'video') {
-      document.getElementById('peer2').srcObject = evt.streams[0];
+      document.getElementById('peer').srcObject = evt.streams[0];
     } else {
       document.getElementById('audio').srcObject = evt.streams[0];
     }
@@ -47,93 +47,73 @@ function createPeerConnection() {
   return pc;
 }
 
-// function negotiate() {
-//   return pc.createOffer()
-//     .then((offer) => {
-//       pc.setLocalDescription(offer);
-//     }).then(()=>{
-//       return fetch('/offer', {
-//         body: JSON.stringify({
-//           sdp: offer.sdp,
-//           type: offer.type,
-//           url: document.querySelector('#url-input').value
-//         }),
-//         headers: {
-//           'Content-Type': 'application/json'
-//         },
-//         method: 'POST'
-//       })
-//     }).then(response => response.json()).then((answer) => {
-//       pc.setRemoteDescription(answer)
-//     })
-// }
-
-
 function negotiate() {
-  return pc.createOffer().then(function(offer) {
-      return pc.setLocalDescription(offer);
-  }).then(function() {
+  return pc.createOffer().then(function (offer) {
+    pc.setLocalDescription(offer);
+  })
+    .then(function () {
       // wait for ICE gathering to complete
-      return new Promise(function(resolve) {
-          if (pc.iceGatheringState === 'complete') {
+      return new Promise(function (resolve) {
+        if (pc.iceGatheringState === 'complete') {
+          resolve();
+        } else {
+          function checkState() {
+            if (pc.iceGatheringState === 'complete') {
+              pc.removeEventListener('icegatheringstatechange', checkState);
               resolve();
-          } else {
-              function checkState() {
-                  if (pc.iceGatheringState === 'complete') {
-                      pc.removeEventListener('icegatheringstatechange', checkState);
-                      resolve();
-                  }
-              }
-              pc.addEventListener('icegatheringstatechange', checkState);
+            }
           }
+          pc.addEventListener('icegatheringstatechange', checkState);
+        }
       });
-  }).then(function() {
+    }).then(function () {
       var offer = pc.localDescription;
 
       return fetch('/offer', {
-          body: JSON.stringify({
-              sdp: offer.sdp,
-              type: offer.type,
-              video_transform: document.querySelector('#url-input').value
-          }),
-          headers: {
-              'Content-Type': 'application/json'
-          },
-          method: 'POST'
+        body: JSON.stringify({
+          sdp: offer.sdp,
+          type: offer.type,
+          url: document.getElementById('url-input').value
+        }),
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        method: 'POST'
       });
-  }).then(function(response) {
+    }).then(function (response) {
       return response.json();
-  }).then(function(answer) {
+    }).then(function (answer) {
       // document.getElementById('answer-sdp').textContent = answer.sdp;
-      console.log( answer)
+      console.log(answer)
       return pc.setRemoteDescription(answer);
-  }).catch(function(e) {
+    }).catch(function (e) {
       alert(e);
-  });
+    });
 }
 
 
 function connection() {
   createPeerConnection();
-  // dc = pc.createDataChannel('only-connect')
-  // stream = navigator.mediaDevices.getUserMedia({ video: true });
-  navigator.mediaDevices.getUserMedia({video:true}).then(function(stream) {
-      stream.getTracks().forEach(function(track) {
-          pc.addTrack(track, stream);
-      });
-      return negotiate();
-  }, function(err) {
-      alert('Could not acquire media: ' + err);
+  dc = pc.createDataChannel('connect')
+  dc.onopen = () => {
+    dataChannelLog.textContent += '-open' + '\n';
+  }
+
+  dc.onmessage = (evt) => {
+    dataChannelLog.textContent += '<' + evt.data + '\n';
+  }
+
+  navigator.mediaDevices.getUserMedia({ video: true }).then(function (stream) {
+    stream.getTracks().forEach(function (track) {
+      pc.addTrack(track, stream);
+      track.enabled = !track.enabled
+    });
+    return negotiate();
+  }, function (err) {
+    alert('Could not acquire media: ' + err);
   });
 
-  // // // document.querySelector('#camera').srcObject = stream;
-  // // pc.addTrack(stream.getTracks()[0], stream)
   // return negotiate();
 }
 
 document.querySelector('#con').addEventListener('click', connection)
-
-function start() {
-
-}
-document.querySelector('#start').addEventListener('click', start)
