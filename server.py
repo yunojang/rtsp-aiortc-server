@@ -9,6 +9,7 @@ import cv2
 from av import VideoFrame
 from av.frame import Frame
 
+import aiohttp_cors
 from aiohttp import web
 from aiohttp_middlewares import cors_middleware
 from aiortc import MediaStreamTrack, RTCPeerConnection, RTCSessionDescription, VideoStreamTrack
@@ -179,11 +180,29 @@ async def js(req):
   content = open(os.path.join(ROOT, "app.js"), "r").read()
   return web.Response(content_type="application/javascript", text=content)
 
+@web.middleware
+async def cors(request, handler):
+    response = await handler(request)
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    return response
+
 if __name__ == "__main__":
-    app = web.Application(middlewares=[cors_middleware(allow_all=True)]);
+    app = web.Application()
     app.router.add_get("/", index)
     app.router.add_get("/app.js", js)
-    app.router.add_post("/offer", offer);
+    app.router.add_post("/offer", offer)
+    
+    cors = aiohttp_cors.setup(app, defaults={
+      "*": aiohttp_cors.ResourceOptions(
+        allow_credentials=True,
+        expose_headers="*",
+        allow_headers="*"
+      )
+    })
+
+    for route in list(app.router.routes()):
+      cors.add(route)
+
     web.run_app(
       app, port=8889
     )
