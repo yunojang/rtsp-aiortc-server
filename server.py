@@ -7,12 +7,12 @@ from typing import Tuple
 
 import cv2
 from av import VideoFrame
-from av.frame import Frame
+# from av.frame import Frame
 
 import aiohttp_cors
 from aiohttp import web
-from aiohttp_middlewares import cors_middleware
 from aiortc import MediaStreamTrack, RTCPeerConnection, RTCSessionDescription, VideoStreamTrack
+# from aiohttp_middlewares import cors_middleware
 # from aiortc.contrib.media import MediaBlackhole, MediaPlayer, MediaRecorder, MediaRelay
 
 ROOT = os.path.dirname(__file__)
@@ -82,10 +82,11 @@ class VideoStreamTrack(MediaStreamTrack):
 
     kind = "video"
 
-    def __init__(self, url = DEFAULT_URL):
+    def __init__(self, cap):
         super().__init__()  # don't forget this!
-        self.url = url
-        self.cap = cv2.VideoCapture(url)
+        self.cap = cap
+        # self.url = url
+        # self.cap = cv2.VideoCapture(url)
         # self.transform = transform
 
     async def next_timestamp(self) -> Tuple[int, fractions.Fraction]:
@@ -106,6 +107,10 @@ class VideoStreamTrack(MediaStreamTrack):
 
         pts, time_base = await self.next_timestamp()
         ret, frame = self.cap.read()
+
+        if not ret:
+          self.cap.release()
+          raise Exception({"code": 404, "message": "Can not read URL"})
 
         # vf = VideoFrame.from_image(Image.fromarray(frame))
         vf = VideoFrame.from_ndarray(frame, format='bgr24')
@@ -146,17 +151,27 @@ async def offer(request):
     pc = RTCPeerConnection()
     pcs.add(pc)
 
-    @pc.on("datachannel")
-    def on_channel(channel):
-      @channel.on('message')
-      def on_message(message):
-        channel.send(message)
-        # pc.addTrack(VideoStreamTrack(message))
+    # @pc.on("datachannel")
+    # def on_channel(channel):
+    #   @channel.on('message')
+    #   def on_message(message):
+    #     channel.send(message)
 
     # @pc.on("track")
     # def on_track(track):
       # print('@@on_track', track)
-    pc.addTrack(VideoStreamTrack(params["url"]))
+    url  = params["url"]
+    cap = cv2.VideoCapture(url)
+    ret, frame = cap.read()
+
+    try:
+      if not ret:
+        raise Exception({"code": 404, "message": "Can not read URL"})
+
+      pc.addTrack(VideoStreamTrack(cap))
+    except Exception as e:
+      cap.release()
+      return web.Response( status = e.code, text = json.dumps(e))
 
     # handle offer
     await pc.setRemoteDescription(offer);
@@ -165,6 +180,8 @@ async def offer(request):
     answer = await pc.createAnswer();
     await pc.setLocalDescription(answer);
 
+    print('@Add Track & return Answer')
+
     return web.Response(
       content_type = "application/json",
       text=json.dumps(
@@ -172,7 +189,8 @@ async def offer(request):
       ),
     )
 
-async def index(request):
+# demo route
+async def index(req):
   content = open(os.path.join(ROOT, "index.html"), "r").read()
   return web.Response(content_type="text/html", text=content)
 
@@ -180,17 +198,24 @@ async def js(req):
   content = open(os.path.join(ROOT, "app.js"), "r").read()
   return web.Response(content_type="application/javascript", text=content)
 
-@web.middleware
-async def cors(request, handler):
-    response = await handler(request)
-    response.headers['Access-Control-Allow-Origin'] = '*'
-    return response
+# test route - cors
+def cors_test(req):
+  return web.Response(content_type="application/json", text=json.dumps(
+      {"test": 1234}
+    ),)
+
+# @web.middleware
+# async def cors(request, handler):
+#     response = await handler(request)
+#     response.headers['Access-Control-Allow-Origin'] = '*'
+#     return response
 
 if __name__ == "__main__":
     app = web.Application()
     app.router.add_get("/", index)
     app.router.add_get("/app.js", js)
     app.router.add_post("/offer", offer)
+    app.router.add_post("/test", cors_test)
     
     cors = aiohttp_cors.setup(app, defaults={
       "*": aiohttp_cors.ResourceOptions(

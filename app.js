@@ -18,10 +18,10 @@ function createPeerConnection() {
       "stun:stun4.l.google.com:19302",]
   }]
 
-  pc = new RTCPeerConnection({});
+  pc = new RTCPeerConnection(config);
 
   pc.addEventListener('track', evt => {
-    console.log(evt)
+    console.log(evt.streams[0])
     if (evt.track.kind == 'video') {
       document.getElementById('peer').srcObject = evt.streams[0];
     } else {
@@ -49,8 +49,8 @@ function createPeerConnection() {
 
 function negotiate() {
   return pc.createOffer({ offerToReceiveVideo: true }).then(function (offer) {
-    console.log(offer.sdp);
     pc.setLocalDescription(offer);
+    // console.log(pc.localDescription)
   })
     .then(function () {
       // wait for ICE gathering to complete
