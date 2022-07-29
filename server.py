@@ -110,7 +110,7 @@ class VideoStreamTrack(MediaStreamTrack):
 
         if not ret:
           self.cap.release()
-          raise Exception({"code": 404, "message": "Can not read URL"})
+          raise Exception("Can not read URL")
 
         # vf = VideoFrame.from_image(Image.fromarray(frame))
         vf = VideoFrame.from_ndarray(frame, format='bgr24')
@@ -160,18 +160,26 @@ async def offer(request):
     # @pc.on("track")
     # def on_track(track):
       # print('@@on_track', track)
-    url  = params["url"]
-    cap = cv2.VideoCapture(url)
-    ret, frame = cap.read()
-
     try:
+      url = params["url"]
+      cap = False
+
+      if len(url) < 8 or url[:7] != "rtsp://":
+        print('check')
+        raise Exception("Can not read URL")
+
+      cap = cv2.VideoCapture(url)
+      ret, frame = cap.read()
+
       if not ret:
-        raise Exception({"code": 404, "message": "Can not read URL"})
+        raise Exception("Can not read URL")
+        # raise Exception({"code": 404, "message": "Can not read URL"})
 
       pc.addTrack(VideoStreamTrack(cap))
     except Exception as e:
-      cap.release()
-      return web.Response( status = e.code, text = json.dumps(e))
+      if cap:
+        cap.release()
+      return web.Response(status='404', text=json.dumps({"code":404, "message": str(e)}))
 
     # handle offer
     await pc.setRemoteDescription(offer);
